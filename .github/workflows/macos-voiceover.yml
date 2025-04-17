@@ -1,18 +1,15 @@
 name: MacOS VoiceOver
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  start-voiceover-and-move-right:
+  voiceover:
     runs-on: ${{ matrix.os }}
     continue-on-error: true
     strategy:
       matrix:
-        os: [macos-13, macos-14, macos-15]
+        os: [macos-13, macos-13-xlarge, macos-14, macos-14-large, macos-latest, macos-15, macos-15-large]
     steps:
       - uses: actions/checkout@v3
       - run: |
