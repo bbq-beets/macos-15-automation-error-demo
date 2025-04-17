@@ -41,25 +41,33 @@ jobs:
                   configure_system_tccdb "$values"
               fi
           done
-      
+
+      - name: Screenshot service
+        run: |
+          mkdir -p screenshots
+          echo 'Starting screenshot background task...'
+          (
+            i=0
+            while true; do
+              screencapture "screenshots/screen_$i.png"
+              sleep 10
+              i=$((i+1))
+            done
+          ) &
+          echo $! > screenshot_pid.txt
+
       - name: Run VoiceOver
         run: |
           # Disable splash screen
           defaults write com.apple.VoiceOverTraining doNotShowSplashScreen -bool true
-
           sleep 1
-
           # Start VoiceOver
           /System/Library/CoreServices/VoiceOver.app/Contents/MacOS/VoiceOverStarter &
-
           # See if VoiceOver process is running
           ps aux | egrep "[V]oiceOver"
-
           # See if AppleScript thinks VoiceOver is running
           /usr/bin/osascript voiceOverRunning.applescript
-          
           sleep 1
-
           # Use AppleScript to "activate" VoiceOver
           until $(/usr/bin/osascript voiceOverActivate.applescript)
           do
@@ -67,15 +75,28 @@ jobs:
             sleep 1
           done
           echo "VO ready."
-
           # Attempt to control VoiceOver using AppleScript
           until $(/usr/bin/osascript voiceOverPerform.applescript)
           do
             echo "Failed to perform AppleScript, retrying..."
             sleep 1
           done
-
           echo "Complete."
-
           # Terminate VoiceOver
           kill -15 $(ps aux | egrep "[V]oiceOver.app/Contents/MacOS/VoiceOver launchd -s" | awk '{print $2}')
+
+      - name: Wait for final screenshots
+        if: always()
+        run: sleep 10
+
+      - name: Kill screenshot task
+        if: always()
+        run: |
+          kill $(cat screenshot_pid.txt) || true
+
+      - name: Upload screenshots as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/
