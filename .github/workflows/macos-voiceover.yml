@@ -12,7 +12,32 @@ jobs:
         os: [macos-13, macos-13-xlarge, macos-14, macos-14-large, macos-latest, macos-15, macos-15-large]
     steps:
       - uses: actions/checkout@v3
-      - run: |
+      - name: Configure System TCC DB
+        run: |
+          configure_system_tccdb () {
+              local values=$1
+              local dbPath="/Library/Application Support/com.apple.TCC/TCC.db"
+              local sqlQuery="INSERT OR IGNORE INTO access VALUES($values);"
+              sudo sqlite3 "$dbPath" "$sqlQuery"
+          }
+          
+          systemValuesArray=(
+              # Sequoia has a new mandatory TCC service for Developer Tools aka Automation on Privacy & Security settings tab
+              # Expected to fix https://github.com/actions/runner-images/issues/11257
+              "'kTCCServiceDeveloperTool','/bin/bash',1,2,0,1,NULL,NULL,NULL,'UNUSED',NULL,0,1583997993"
+              "'kTCCServiceDeveloperTool','com.apple.Terminal',0,2,4,1,X'fade0c000000003000000001000000060000000200000012636f6d2e6170706c652e5465726d696e616c000000000003',NULL,0,'UNUSED',NULL,0,1678990068"
+          )
+          for values in "${systemValuesArray[@]}"; do
+              if is_Sonoma || is_Sequoia; then
+                  # TCC access table in Sonoma has extra 4 columns: pid, pid_version, boot_uuid, last_reminded
+                  configure_system_tccdb "$values,NULL,NULL,'UNUSED',${values##*,}"
+              else
+                  configure_system_tccdb "$values"
+              fi
+          done
+      
+      - name: Run VoiceOver
+        run: |
           # Disable splash screen
           defaults write com.apple.VoiceOverTraining doNotShowSplashScreen -bool true
 
